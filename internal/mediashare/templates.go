@@ -39,6 +39,7 @@ type FileListItem struct {
 	UploadedAt   string
 	LastOpenedAt string
 	URL          string
+	RawURL       string
 }
 
 // ListPageData contains data for the file list page.
@@ -375,6 +376,16 @@ const listTemplateHTML = `<!DOCTYPE html>
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
         }
+        /* Mini player styles */
+        .mini-video { max-height: 120px; border-radius: 0.5rem; }
+        .mini-audio { width: 100%; max-width: 250px; }
+        .mini-thumb { max-height: 80px; max-width: 120px; object-fit: cover; border-radius: 0.5rem; cursor: pointer; transition: transform 0.2s; }
+        .mini-thumb:hover { transform: scale(1.05); }
+        /* Lightbox */
+        .lightbox { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 100; justify-content: center; align-items: center; }
+        .lightbox.active { display: flex; }
+        .lightbox img { max-width: 90vw; max-height: 90vh; object-fit: contain; }
+        .lightbox-close { position: absolute; top: 1rem; right: 1rem; color: white; font-size: 2rem; cursor: pointer; }
     </style>
 </head>
 <body class="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 text-gray-900 dark:text-gray-100 transition-colors duration-300">
@@ -399,54 +410,85 @@ const listTemplateHTML = `<!DOCTYPE html>
         </div>
     </header>
 
+    <!-- Lightbox for images -->
+    <div id="lightbox" class="lightbox" onclick="closeLightbox()">
+        <span class="lightbox-close">&times;</span>
+        <img id="lightbox-img" src="" alt="">
+    </div>
+
     <!-- Main content -->
     <main class="pt-20 pb-16 px-4">
         <div class="max-w-6xl mx-auto fade-in">
             <h1 class="text-2xl font-bold mb-6">{{index .T "recent_files"}}</h1>
 
             {{if .Files}}
-            <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-hidden">
-                <div class="overflow-x-auto">
-                    <table class="w-full">
-                        <thead class="bg-gray-50 dark:bg-gray-700/50">
-                            <tr>
-                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">{{index .T "table_date"}}</th>
-                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">{{index .T "table_user"}}</th>
-                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">{{index .T "table_file"}}</th>
-                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">{{index .T "table_link"}}</th>
-                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">{{index .T "table_last_opened"}}</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-                            {{range .Files}}
-                            <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
-                                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">{{.UploadedAt}}</td>
-                                <td class="px-4 py-3 whitespace-nowrap text-sm">
-                                    <span class="font-medium text-gray-900 dark:text-gray-100">{{.Username}}</span>
-                                </td>
-                                <td class="px-4 py-3 text-sm">
-                                    <div class="flex items-center gap-2">
-                                        {{if eq .ContentType "video"}}
-                                        <svg class="w-4 h-4 text-blue-500" fill="currentColor" viewBox="0 0 20 20"><path d="M2 6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM14.553 7.106A1 1 0 0014 8v4a1 1 0 00.553.894l2 1A1 1 0 0018 13V7a1 1 0 00-1.447-.894l-2 1z"/></svg>
-                                        {{else if eq .ContentType "audio"}}
-                                        <svg class="w-4 h-4 text-purple-500" fill="currentColor" viewBox="0 0 20 20"><path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6v5.894A4.37 4.37 0 0015 12c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V3z"/></svg>
-                                        {{else if eq .ContentType "image"}}
-                                        <svg class="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clip-rule="evenodd"/></svg>
-                                        {{else}}
-                                        <svg class="w-4 h-4 text-gray-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clip-rule="evenodd"/></svg>
-                                        {{end}}
-                                        <span class="truncate max-w-xs" title="{{.Filename}}">{{.Filename}}</span>
-                                    </div>
-                                </td>
-                                <td class="px-4 py-3 whitespace-nowrap text-sm">
-                                    <a href="{{.URL}}" class="text-primary-600 dark:text-primary-400 hover:underline font-mono">{{.ID}}</a>
-                                </td>
-                                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">{{.LastOpenedAt}}</td>
-                            </tr>
+            <div class="grid gap-4">
+                {{range .Files}}
+                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow">
+                    <div class="flex flex-col md:flex-row">
+                        <!-- Media preview -->
+                        <div class="md:w-64 bg-gray-100 dark:bg-gray-900 flex items-center justify-center p-3 min-h-[100px]">
+                            {{if eq .ContentType "video"}}
+                            <video controls preload="metadata" class="mini-video w-full">
+                                <source src="{{.RawURL}}" type="video/mp4">
+                            </video>
+                            {{else if eq .ContentType "audio"}}
+                            <div class="w-full flex flex-col items-center gap-2">
+                                <svg class="w-8 h-8 text-purple-500" fill="currentColor" viewBox="0 0 20 20"><path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6v5.894A4.37 4.37 0 0015 12c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V3z"/></svg>
+                                <audio controls preload="metadata" class="mini-audio">
+                                    <source src="{{.RawURL}}">
+                                </audio>
+                            </div>
+                            {{else if eq .ContentType "image"}}
+                            <img src="{{.RawURL}}" alt="{{.Filename}}" class="mini-thumb" onclick="openLightbox('{{.RawURL}}', event)" loading="lazy">
+                            {{else}}
+                            <div class="text-center text-gray-400">
+                                <svg class="w-10 h-10 mx-auto" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clip-rule="evenodd"/></svg>
+                            </div>
                             {{end}}
-                        </tbody>
-                    </table>
+                        </div>
+
+                        <!-- File info -->
+                        <div class="flex-1 p-4">
+                            <div class="flex flex-wrap items-start justify-between gap-2">
+                                <div class="flex-1 min-w-0">
+                                    <a href="{{.URL}}" class="text-lg font-semibold text-gray-900 dark:text-gray-100 hover:text-primary-600 dark:hover:text-primary-400 truncate block" title="{{.Filename}}">
+                                        {{.Filename}}
+                                    </a>
+                                    <div class="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-sm text-gray-600 dark:text-gray-400">
+                                        <span class="flex items-center gap-1">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                                            {{.Username}}
+                                        </span>
+                                        <span class="flex items-center gap-1">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                            {{.UploadedAt}}
+                                        </span>
+                                        <span class="flex items-center gap-1 text-xs">
+                                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                            {{.LastOpenedAt}}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    {{if eq .ContentType "video"}}
+                                    <span class="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 rounded">VIDEO</span>
+                                    {{else if eq .ContentType "audio"}}
+                                    <span class="px-2 py-1 text-xs font-medium bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300 rounded">AUDIO</span>
+                                    {{else if eq .ContentType "image"}}
+                                    <span class="px-2 py-1 text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 rounded">IMAGE</span>
+                                    {{else}}
+                                    <span class="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 rounded">FILE</span>
+                                    {{end}}
+                                    <a href="{{.URL}}" class="p-2 text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-lg transition-colors" title="{{index $.T "open_in_new_tab"}}">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
+                {{end}}
             </div>
             {{else}}
             <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-12 text-center">
@@ -470,6 +512,20 @@ const listTemplateHTML = `<!DOCTYPE html>
             document.documentElement.classList.toggle('dark');
             localStorage.theme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
         }
+
+        function openLightbox(src, event) {
+            event.stopPropagation();
+            document.getElementById('lightbox-img').src = src;
+            document.getElementById('lightbox').classList.add('active');
+        }
+
+        function closeLightbox() {
+            document.getElementById('lightbox').classList.remove('active');
+        }
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') closeLightbox();
+        });
     </script>
 </body>
 </html>`
