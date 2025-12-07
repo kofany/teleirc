@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -229,5 +230,50 @@ func TestNotFound(t *testing.T) {
 
 	if w.Code != http.StatusNotFound {
 		t.Errorf("Expected status 404, got %d", w.Code)
+	}
+}
+
+func TestListEndpoint(t *testing.T) {
+	server, tmpDir := setupTestServer(t)
+	defer os.RemoveAll(tmpDir)
+	defer server.Close()
+
+	// First upload a file
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	part, _ := writer.CreateFormFile("file", "test.mp4")
+	part.Write([]byte("fake video content"))
+	writer.WriteField("username", "testuser")
+	writer.Close()
+
+	uploadReq := httptest.NewRequest("POST", "/upload", body)
+	uploadReq.Header.Set("Content-Type", writer.FormDataContentType())
+	uploadReq.Header.Set("X-API-Key", "testkey")
+	uploadW := httptest.NewRecorder()
+
+	server.ServeHTTP(uploadW, uploadReq)
+
+	// Now check the list page
+	listReq := httptest.NewRequest("GET", "/", nil)
+	listW := httptest.NewRecorder()
+
+	server.ServeHTTP(listW, listReq)
+
+	if listW.Code != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", listW.Code)
+	}
+
+	contentType := listW.Header().Get("Content-Type")
+	if contentType != "text/html; charset=utf-8" {
+		t.Errorf("Expected HTML content type, got %s", contentType)
+	}
+
+	// Check that response contains the uploaded file info
+	responseBody := listW.Body.String()
+	if !strings.Contains(responseBody, "test.mp4") {
+		t.Error("Expected list page to contain uploaded filename")
+	}
+	if !strings.Contains(responseBody, "testuser") {
+		t.Error("Expected list page to contain username")
 	}
 }

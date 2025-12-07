@@ -192,9 +192,9 @@ func (s *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Root path - could show a landing page or redirect
+	// Root path - show file list
 	if r.URL.Path == "/" {
-		s.sendNotFound(w)
+		s.handleList(w, r)
 		return
 	}
 
@@ -241,6 +241,67 @@ func (s *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := PlayerTemplate.Execute(w, data); err != nil {
 		log.Printf("[%s] Template error: %v", s.config.ServiceName, err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	}
+}
+
+func (s *Server) handleList(w http.ResponseWriter, r *http.Request) {
+	// Get recent files from database (last 50)
+	records, err := s.db.GetRecentFiles(50)
+	if err != nil {
+		log.Printf("[%s] Failed to get recent files: %v", s.config.ServiceName, err)
+		records = []*FileRecord{}
+	}
+
+	// Convert to template data
+	baseURL := strings.TrimSuffix(s.config.BaseURL, "/")
+	files := make([]FileListItem, 0, len(records))
+
+	for _, rec := range records {
+		// Determine content type category
+		contentType := "file"
+		if IsVideo(rec.ContentType) {
+			contentType = "video"
+		} else if IsAudio(rec.ContentType) {
+			contentType = "audio"
+		} else if IsImage(rec.ContentType) {
+			contentType = "image"
+		}
+
+		// Format last opened
+		lastOpened := s.i18n.T("never")
+		if rec.LastOpenedAt != nil {
+			lastOpened = rec.LastOpenedAt.Format("2006-01-02 15:04")
+		}
+
+		// Format username
+		username := rec.Username
+		if username == "" {
+			username = s.i18n.T("anonymous")
+		}
+
+		files = append(files, FileListItem{
+			ID:           rec.ID,
+			Filename:     rec.Filename,
+			ContentType:  contentType,
+			Username:     username,
+			UploadedAt:   rec.UploadedAt.Format("2006-01-02 15:04"),
+			LastOpenedAt: lastOpened,
+			URL:          fmt.Sprintf("%s/%s", baseURL, rec.ID),
+		})
+	}
+
+	data := ListPageData{
+		ServiceName: s.config.ServiceName,
+		Lang:        s.i18n.Lang(),
+		T:           s.i18n.GetTranslations(),
+		Files:       files,
+		BaseURL:     baseURL,
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := ListTemplate.Execute(w, data); err != nil {
+		log.Printf("[%s] List template error: %v", s.config.ServiceName, err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 	}
 }
