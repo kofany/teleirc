@@ -161,20 +161,25 @@ func stickerHandler(tg *Client, u tgbotapi.Update) {
 }
 
 /*
-photoHandler handles the Message.Photo Telegram object. Only acknowledges Photo
-exists, and sends notification to IRC
+photoHandler handles the Message.Photo Telegram object. Uploads photo
+and sends notification with link to IRC.
 */
 func photoHandler(tg *Client, u tgbotapi.Update) {
-	link := uploadImage(tg, u)
 	username := GetUsername(tg.IRCSettings.ShowZWSP, u.Message.From)
+
+	// Get the largest photo size
+	photo := (*u.Message.Photo)[len(*u.Message.Photo)-1]
+
+	// Try to upload
+	link := uploadPhoto(tg, photo.FileID, username)
+
 	caption := u.Message.Caption
 	if caption == "" {
 		caption = "No caption provided."
 	}
 
-	// TeleIRC can fail to upload to Imgur
 	if link == "" {
-		tg.logger.LogError("Failed imgur photo upload for", username)
+		tg.logger.LogError("Failed photo upload for", username)
 	} else {
 		formatted := "'" + caption + "' uploaded by " + username + ": " + link
 		tg.sendToIrc(formatted)
@@ -226,32 +231,38 @@ func locationHandler(tg *Client, u *tgbotapi.Message) {
 
 /*
 videoHandler receives a video object from Telegram, and sends
-a notification to IRC.
+a notification to IRC with optional upload link.
 */
 func videoHandler(tg *Client, u *tgbotapi.Message) {
 	username := GetUsername(tg.IRCSettings.ShowZWSP, u.From)
-	formatted := username + " shared a video"
-	if u.Caption != "" {
-		formatted += " on Telegram with caption: '" + u.Caption + "'."
-	} else {
-		formatted += " on Telegram."
+
+	// Try to upload and get link
+	var link string
+	if u.Video != nil {
+		filename := "video.mp4"
+		if u.Video.MimeType == "video/webm" {
+			filename = "video.webm"
+		}
+		link = uploadVideo(tg, u.Video.FileID, filename, username)
 	}
 
+	formatted := formatMediaMessage(username, "video", u.Caption, link)
 	tg.sendToIrc(formatted)
 }
 
 /*
 voiceHandler receives a voice message object from Telegram, and sends
-a notification to IRC.
+a notification to IRC with optional upload link.
 */
 func voiceHandler(tg *Client, u *tgbotapi.Message) {
 	username := GetUsername(tg.IRCSettings.ShowZWSP, u.From)
-	formatted := username + " shared a voice message"
-	if u.Caption != "" {
-		formatted += " on Telegram with caption: '" + u.Caption + "'."
-	} else {
-		formatted += " on Telegram."
+
+	// Try to upload and get link
+	var link string
+	if u.Voice != nil {
+		link = uploadVoice(tg, u.Voice.FileID, username)
 	}
 
+	formatted := formatMediaMessage(username, "voice message", u.Caption, link)
 	tg.sendToIrc(formatted)
 }
