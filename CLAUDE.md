@@ -75,3 +75,59 @@ Tests verify behavior contracts, not implementation details. See `docs/dev/testi
 - `github.com/go-telegram-bot-api/telegram-bot-api` - Telegram API
 - `github.com/caarlos0/env/v6` - Environment config parsing
 - `github.com/golang/mock` - Mock generation
+- `modernc.org/sqlite` - Pure Go SQLite (for MediaShare)
+
+## MediaShare Microservice
+
+Self-hosted media sharing service for videos, voice messages, and photos from Telegram.
+
+**Location:** `cmd/mediashare/` (standalone binary), `internal/mediashare/` (library)
+
+**Build MediaShare:**
+```bash
+go build -o mediashare ./cmd/mediashare
+```
+
+**Run MediaShare:**
+```bash
+./mediashare -port 8080 -url https://media.example.com -key YOUR_API_KEY
+```
+
+**Architecture:**
+```
+internal/mediashare/
+├── server.go      # HTTP server, routing, cleanup worker
+├── storage.go     # File storage, ID generation
+├── database.go    # SQLite metadata (username, timestamps, open count)
+├── templates.go   # HTML templates (Tailwind CSS, dark/light mode)
+└── i18n.go        # Translations (Polish/English)
+```
+
+**Key features:**
+- 5-character alphanumeric URLs: `https://domain/Ab3xK`
+- SQLite for metadata persistence
+- Auto-cleanup: files not opened for 72h are deleted
+- Dark/light mode with CSS `prefers-color-scheme`
+- Multi-language support (pl/en)
+
+**Configuration (env vars):**
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MEDIASHARE_PORT` | 8080 | Server port |
+| `MEDIASHARE_BASE_URL` | http://localhost:8080 | Public URL for links |
+| `MEDIASHARE_API_KEY` | (none) | Authentication key |
+| `MEDIASHARE_STORAGE_PATH` | ./uploads | File storage directory |
+| `MEDIASHARE_DB_PATH` | ./mediashare.db | SQLite database path |
+| `MEDIASHARE_RETENTION_HOURS` | 72 | Auto-delete after X hours |
+| `MEDIASHARE_SERVICE_NAME` | MediaShare | Branding in HTML |
+| `MEDIASHARE_LANGUAGE` | pl | UI language (pl/en) |
+
+**TeleIRC integration:**
+Set these in TeleIRC's env to enable MediaShare uploads:
+```bash
+MEDIASHARE_ENABLED=true
+MEDIASHARE_ENDPOINT=http://localhost:8080
+MEDIASHARE_API_KEY=your_shared_key
+```
+
+**Deployment guide:** See `docs/websetup.md` for Caddy/systemd configuration.
