@@ -30,6 +30,18 @@ var translations = map[Language]map[string]string{
 		"error_loading":      "Błąd ładowania pliku",
 		"open_in_new_tab":    "Otwórz w nowej karcie",
 
+		// List page
+		"recent_files":       "Ostatnie pliki",
+		"no_files":           "Brak plików",
+		"no_files_desc":      "Nie ma jeszcze żadnych przesłanych plików.",
+		"table_date":         "Data",
+		"table_user":         "Użytkownik",
+		"table_file":         "Plik",
+		"table_link":         "Link",
+		"table_last_opened":  "Ostatnio otwarte",
+		"never":              "nigdy",
+		"anonymous":          "anonim",
+
 		// IRC messages (format: "user udostępnił X: URL")
 		"shared_video": "%s udostępnił wideo",
 		"shared_voice": "%s udostępnił wiadomość głosową",
@@ -54,6 +66,18 @@ var translations = map[Language]map[string]string{
 		"loading":            "Loading...",
 		"error_loading":      "Error loading file",
 		"open_in_new_tab":    "Open in new tab",
+
+		// List page
+		"recent_files":       "Recent files",
+		"no_files":           "No files",
+		"no_files_desc":      "There are no uploaded files yet.",
+		"table_date":         "Date",
+		"table_user":         "User",
+		"table_file":         "File",
+		"table_link":         "Link",
+		"table_last_opened":  "Last opened",
+		"never":              "never",
+		"anonymous":          "anonymous",
 
 		// IRC messages
 		"shared_video": "%s shared a video",

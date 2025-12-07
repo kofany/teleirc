@@ -223,6 +223,54 @@ func (d *Database) Exists(id string) (bool, error) {
 	return true, nil
 }
 
+// GetRecentFiles returns the most recent files, ordered by upload date descending.
+func (d *Database) GetRecentFiles(limit int) ([]*FileRecord, error) {
+	query := `
+	SELECT id, filename, content_type, size, path, username, uploaded_at, last_opened_at, open_count
+	FROM files
+	ORDER BY uploaded_at DESC
+	LIMIT ?
+	`
+	rows, err := d.db.Query(query, limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query recent files: %w", err)
+	}
+	defer rows.Close()
+
+	var records []*FileRecord
+	for rows.Next() {
+		var record FileRecord
+		var lastOpenedAt sql.NullTime
+		var username sql.NullString
+
+		err := rows.Scan(
+			&record.ID,
+			&record.Filename,
+			&record.ContentType,
+			&record.Size,
+			&record.Path,
+			&username,
+			&record.UploadedAt,
+			&lastOpenedAt,
+			&record.OpenCount,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan file record: %w", err)
+		}
+
+		if lastOpenedAt.Valid {
+			record.LastOpenedAt = &lastOpenedAt.Time
+		}
+		if username.Valid {
+			record.Username = username.String
+		}
+
+		records = append(records, &record)
+	}
+
+	return records, nil
+}
+
 // Close closes the database connection.
 func (d *Database) Close() error {
 	return d.db.Close()
