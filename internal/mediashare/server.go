@@ -288,6 +288,7 @@ func (s *Server) handleList(w http.ResponseWriter, r *http.Request) {
 			UploadedAt:   rec.UploadedAt.Format("2006-01-02 15:04"),
 			LastOpenedAt: lastOpened,
 			URL:          fmt.Sprintf("%s/%s", baseURL, rec.ID),
+			RawURL:       fmt.Sprintf("%s/r/%s", baseURL, rec.ID),
 		})
 	}
 
